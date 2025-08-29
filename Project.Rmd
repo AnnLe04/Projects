@@ -1,0 +1,147 @@
+---
+title: "Wage Analysis"
+output: html_document
+date: "2025-07-26"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data 
+```{r}
+library(ggplot2)
+library(dplyr)
+library(MASS)
+library(car)
+if(!require("corrgram")) {install.packages("corrgram", dependencies = TRUE)}
+if(!require("car")) {install.packages("car", dependencies = TRUE)}
+library(corrgram)
+
+```
+
+```{r cars}
+wage <- read.table("/Users/tungtran/Downloads/wage.data.txt", header = TRUE)
+head(wage)
+
+```
+```{r}
+summary(wage)
+```
+
+## EDA
+
+Checking outliers by box plots
+
+```{r pressure, echo=FALSE}
+# Histogram of wage
+ggplot(wage, aes(x = wage)) +
+  geom_histogram(bins = 30, fill = "skyblue", color = "black") +
+  labs(title = "Histogram of Wages", x = "Wage", y = "Frequency")
+```
+
+```{r}
+# Boxplot of wage by union membership
+ggplot(wage, aes(x = factor(union), y = wage)) +
+  geom_boxplot(fill = "lightgreen") +
+  labs(title = "Wage by Union Membership", x = "Union (0 = No, 1 = Yes)", y = "Wage")
+```
+
+
+```{r}
+# Boxplot of wage by sex
+ggplot(wage, aes(x = factor(sex), y = wage)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(title = "Wage by Sex", x = "Sex (0 = Female, 1 = Male)", y = "Wage")
+```
+
+
+```{r}
+# Bar plots of categorical variables
+categorical_vars <- c("south", "sex", "union", "race", "sector", "marr")
+for (var in categorical_vars) {
+  print(
+    ggplot(wage, aes_string(x = var)) +
+      geom_bar(fill = "salmon", color = "black") +
+      labs(title = paste("Distribution of", var), x = var, y = "Count")
+  )
+}
+```
+## Model 
+```{r}
+lm_model <- lm(wage ~ education + south + sex + experience + union + age + race + occupation + sector + marr,
+                data = wage)
+summary(lm_model)
+```
+```{r}
+# a. Normal probability plot of residuals
+qqnorm(residuals(lm_model), main = "Normal Q-Q Plot")
+qqline(residuals(lm_model))
+```
+```{r}
+# b. Residuals vs. fitted values plot
+plot(lm_model$fitted.values, residuals(lm_model),
+     xlab = "Fitted Values", ylab = "Residuals", main = "Residuals vs. Fitted Values")
+abline(h = 0, col = "red")
+```
+
+
+```{r}
+# c. Partial regression plots
+avPlots(lm_model)
+```
+
+
+```{r}
+# d. Studentized and R-student residuals
+student_resid <- rstandard(lm_model)
+rstudent_resid <- rstudent(lm_model)
+student_resid 
+
+```
+
+
+```{r}
+# Histogram of studentized residuals
+hist(student_resid, main = "Histogram of Studentized Residuals", xlab = "Studentized Residuals")
+```
+```{r}
+vif(lm_model)
+```
+
+```{r}
+refined_lm_model <- lm(wage ~ education  + sex + experience + union,data = wage)
+summary(refined_lm_model)
+```
+
+```{r}
+if (!require(leaps)) install.packages('leaps', dependencies = TRUE)
+library(leaps)
+
+best_subsets <- regsubsets(wage ~ ., data = wage, nvmax = 11) # SOLUTION
+best_summary <- summary(best_subsets) # SOLUTION
+best_summary
+
+plot(best_summary$bic, xlab = "Number of Variables", ylab = "BIC", type = "b") # SOLUTION
+```
+```{r}
+best_model_coef <- coef(best_subsets, 4) # SOLUTION
+best_model_coef 
+```
+## Logistic Regression
+```{r}
+wage$high_wage <- ifelse(wage$wage > median(wage$wage), 1, 0)
+
+```
+
+```{r}
+logit_model <- glm(high_wage ~ education + south + sex + experience + union + age + race + occupation + sector + marr,
+                  data = wage, family = binomial)
+summary(logit_model)
+
+```
+```{r}
+step_model <- stepAIC(logit_model, direction = "both", trace = FALSE)
+summary(step_model)
+```
+
